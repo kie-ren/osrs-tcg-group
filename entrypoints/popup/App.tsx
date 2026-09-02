@@ -10,6 +10,7 @@ import {
   parseProfileExport,
   reverseBetaTrade,
 } from '../../src/collections';
+import { createCollectionViewRows } from '../../src/collectionView';
 import { exportGroupWorkbook } from '../../src/exportWorkbook';
 import type { SyncPlayerMessage, SyncPlayerResponse } from '../../src/messages';
 import { paginate } from '../../src/pagination';
@@ -40,6 +41,7 @@ function App({ fullPage = false }: AppProps) {
   const [search, setSearch] = useState('');
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [foilsOnly, setFoilsOnly] = useState(false);
+  const [combineSources, setCombineSources] = useState(true);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState('');
   const [saveTarget, setSaveTarget] = useState<string>();
@@ -59,25 +61,19 @@ function App({ fullPage = false }: AppProps) {
     return watchState(setState);
   }, []);
 
-  useEffect(() => setPage(0), [search, duplicatesOnly, foilsOnly]);
+  useEffect(() => setPage(0), [search, duplicatesOnly, foilsOnly, combineSources]);
 
   const players = useMemo(() => Object.values(state.players), [state.players]);
   const rows = useMemo(() => {
-    const byPlayer = players.map((player) => new Map(combinePlayerCollection(player, state.trades).map((card) => [card.name, card])));
-    const names = new Set<string>();
-    byPlayer.forEach((cards) => cards.forEach((_, name) => names.add(name)));
     const query = search.trim().toLowerCase();
-    return [...names]
-      .sort((a, b) => a.localeCompare(b))
-      .filter((name) => !query || name.toLowerCase().includes(query))
-      .filter((name) => {
-        const cards = byPlayer.map((collection) => collection.get(name));
-        if (duplicatesOnly && !cards.some((card) => (card?.total.normal ?? 0) > 1 || (card?.total.foil ?? 0) > 1)) return false;
-        if (foilsOnly && !cards.some((card) => (card?.total.foil ?? 0) > 0)) return false;
+    return createCollectionViewRows(players, state.trades, combineSources)
+      .filter((row) => !query || row.name.toLowerCase().includes(query))
+      .filter((row) => {
+        if (duplicatesOnly && !row.cards.some((card) => (card?.normal ?? 0) > 1 || (card?.foil ?? 0) > 1)) return false;
+        if (foilsOnly && !row.cards.some((card) => (card?.foil ?? 0) > 0)) return false;
         return true;
-      })
-      .map((name) => ({ name, cards: byPlayer.map((collection) => collection.get(name)) }));
-  }, [players, state.trades, search, duplicatesOnly, foilsOnly]);
+      });
+  }, [players, state.trades, search, duplicatesOnly, foilsOnly, combineSources]);
 
   const totals = useMemo(() => {
     const unique = new Set<string>();
@@ -191,7 +187,7 @@ function App({ fullPage = false }: AppProps) {
       if (!player) throw new Error('The selected player is no longer in the group.');
       player.legacy = legacy;
       await updateState(next);
-      setNotice(`Imported ${legacy.totalCopies.toLocaleString()} beta copies for ${player.displayName}.`);
+      setNotice(`Imported ${legacy.totalCopies.toLocaleString()} fallback beta copies for ${player.displayName}. Public beta will be used when available.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Unable to import save.');
     } finally {
@@ -240,7 +236,7 @@ function App({ fullPage = false }: AppProps) {
         <div className="hero-copy">
           <p className="eyebrow">OSRS COLLECTION TOOLS</p>
           <h1>Group album</h1>
-          <p className="subtitle">Live cards, complete beta saves, and useful duplicates in one place.</p>
+          <p className="subtitle">Live current and beta cards, trades, and useful duplicates in one place.</p>
         </div>
         {!fullPage && <button className="open-full" onClick={() => void openFullScreen()}>Open full screen ↗</button>}
       </header>
@@ -332,7 +328,7 @@ function App({ fullPage = false }: AppProps) {
                 <div><span>Foils</span><strong>{((current?.foilCopies ?? 0) + effectiveBeta.foils).toLocaleString()}</strong></div>
               </div>
               <p className="source-note">
-                Beta source: <b>{player.legacy ? 'full .save file' : player.website ? 'public album fallback' : 'not loaded'}</b>
+                Beta source: <b>{player.website ? 'public album' : player.legacy ? 'imported .save fallback' : 'not loaded'}</b>
                 {player.website && <> · synced {formatDate(player.website.capturedAt)}</>}
               </p>
               {player.lastError && <p className="error-copy">{player.lastError}</p>}
@@ -340,7 +336,7 @@ function App({ fullPage = false }: AppProps) {
                 <button onClick={() => void syncPlayer(player.slug)} disabled={syncing[player.slug]}>
                   {syncing[player.slug] ? 'Syncing pages…' : 'Sync live cards'}
                 </button>
-                <button onClick={() => chooseSave(player.slug)}>Import beta save</button>
+                <button onClick={() => chooseSave(player.slug)}>Import beta fallback</button>
                 <button onClick={() => downloadJson(createProfileExport(player), `${player.slug}-tcg-profile.json`)}>Export profile</button>
                 <button className="danger" onClick={() => void removePlayer(player)}>Remove</button>
               </div>
@@ -441,6 +437,9 @@ function App({ fullPage = false }: AppProps) {
 
       <section className="panel filters">
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cards…" aria-label="Search cards" />
+        <label title="Add beta and current copies together when calculating duplicates">
+          <input type="checkbox" checked={combineSources} onChange={(event) => setCombineSources(event.target.checked)} /> Combine beta + current
+        </label>
         <label><input type="checkbox" checked={duplicatesOnly} onChange={(event) => setDuplicatesOnly(event.target.checked)} /> Duplicates only</label>
         <label><input type="checkbox" checked={foilsOnly} onChange={(event) => setFoilsOnly(event.target.checked)} /> Foils only</label>
         <span>{rows.length.toLocaleString()} cards</span>
@@ -451,14 +450,15 @@ function App({ fullPage = false }: AppProps) {
           <thead><tr><th>Card</th>{players.map((player) => <th key={player.slug}>{player.displayName}</th>)}</tr></thead>
           <tbody>
             {visibleRows.map((row) => (
-              <tr key={row.name}>
+              <tr key={row.key}>
                 <td>
                   {row.name}
+                  {row.source === 'beta' && <span className="beta-pill">Beta</span>}
                   {state.trades.some((trade) => !trade.reversedAt && trade.cardName === row.name) && <span className="traded-pill">Moved</span>}
                 </td>
                 {row.cards.map((card, index) => {
-                  const normal = card?.total.normal ?? 0;
-                  const foil = card?.total.foil ?? 0;
+                  const normal = card?.normal ?? 0;
+                  const foil = card?.foil ?? 0;
                   const duplicate = normal > 1 || foil > 1;
                   return <td className={!normal && !foil ? 'missing' : duplicate ? 'duplicate' : ''} key={players[index]!.slug}>
                     {normal || foil ? <><b>{normal}</b>{foil > 0 && <span className="foil-pill">★ {foil}</span>}</> : '—'}

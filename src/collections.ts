@@ -65,9 +65,10 @@ export function createSourceSnapshot(
 }
 
 export function combinePlayerCollection(player: PlayerCollection, trades: BetaTrade[] = []): CombinedCard[] {
-  // Public beta data overlaps the old collection but may omit some historical
-  // copies. A legacy save is the authoritative complete source when available.
-  const sourceBetaCards = player.legacy?.cards ?? player.website?.beta.cards ?? {};
+  // The public album already contains the migrated beta collection, so prefer
+  // it whenever a website snapshot exists. An imported save is only a fallback
+  // for players whose public beta collection is unavailable.
+  const sourceBetaCards = player.website?.beta.cards ?? player.legacy?.cards ?? {};
   const betaCards: Record<string, VariantCounts> = Object.fromEntries(
     Object.entries(sourceBetaCards).map(([name, counts]) => [name, { ...counts }]),
   );

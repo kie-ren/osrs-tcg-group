@@ -2,7 +2,7 @@
   "name": "osrs-tcg-group",
   "description": "Compare OSRS TCG collections, duplicates, and foils with friends.",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

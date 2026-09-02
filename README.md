@@ -8,7 +8,9 @@ A Chrome extension for comparing OSRS TCG cards, duplicates, and foils across a 
 - Follows every page of the public API automatically.
 - Separates current and migrated beta card variants.
 - Imports `RLTCG_v2` and `RLTCG_v3` RuneLite `.save` files locally.
-- Uses the full legacy save for beta counts when available, preserving historical copies omitted by migration.
+- Uses migrated beta cards from the public album by default, with an imported legacy save available only as a fallback.
+- Combines beta and current counts by default so duplicates are found regardless of source.
+- Can show beta and current rows separately, with beta cards clearly labelled.
 - Highlights normal duplicates and foils in the group table.
 - Opens as a full-page dashboard in its own Chrome tab.
 - Records normal or foil beta-card movements between players without changing the source imports.
@@ -93,12 +95,22 @@ The generated extension is written to `.output/chrome-mv3`.
 Each friend does this once:
 
 1. Add their public OSRS TCG album.
-2. Click **Import beta save** and select their old `tcg.save` file.
-3. Click **Export profile** and send the resulting JSON file to the group organiser.
+2. Send their public album URL or player name to the group organiser.
 
-The organiser clicks **Import profiles**. From then on, **Sync all** refreshes every player's new cards directly from their public album. The shared profile only contains normalised beta card counts and the public album name.
+The organiser can add every public album directly and use **Sync all** to refresh both current and migrated beta cards. No profile exchange or local save is normally required.
 
-If a player does not have their old save, the public album's migrated beta cards are used as a fallback. The migration retains many beta copies, but it may not preserve every historical copy.
+If a public album's beta collection is unavailable, that player can instead:
+
+1. Click **Import beta fallback** and select their old `tcg.save` file.
+2. Click **Export profile** and send the resulting JSON file to the group organiser.
+
+The organiser clicks **Import profiles** once. The shared profile contains only normalised fallback beta counts and the public album name. As soon as a public album sync succeeds, its API beta data takes priority over the imported fallback.
+
+## Combined and separate collection views
+
+**Combine beta + current** is enabled by default. Each player's beta and current normal counts are added together before duplicate highlighting, so one beta copy plus one current copy is shown as two copies and therefore a duplicate.
+
+Turn the option off to inspect the sources separately. Beta rows receive a **Beta** badge; unbadged rows are current cards. Duplicate and foil filters then apply to each separate source row.
 
 ## Future shared trade syncing
 
@@ -120,7 +132,7 @@ For each player:
 
 ```text
 combined collection = current public API cards
-                    + full legacy save beta cards (when imported)
+                    + public API beta cards
 ```
 
-When a legacy save is not imported, public API beta cards are used instead. Public beta and local beta are never added together, so migrated cards are not double-counted.
+If public API beta data is unavailable, an imported legacy save is used as a fallback. Public beta and local beta are never added together, so migrated cards are not double-counted.

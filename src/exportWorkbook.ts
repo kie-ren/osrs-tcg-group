@@ -106,11 +106,11 @@ export async function createGroupWorkbook(state: AppState): Promise<ExcelJS.Work
 
   const sources = workbook.addWorksheet('Sources', { views: [{ state: 'frozen', ySplit: 1 }] });
   sources.addRow([
-    'Player', 'Beta source', 'Imported beta copies', 'Beta copies after trades',
+    'Player', 'Beta source', 'Source beta copies', 'Beta copies after trades',
     'Beta foils after trades', 'Current copies', 'Current foils', 'Last website sync',
   ]);
   players.forEach((player) => {
-    const beta = player.legacy ?? player.website?.beta;
+    const beta = player.website?.beta ?? player.legacy;
     const effectiveBeta = combinePlayerCollection(player, state.trades).reduce(
       (total, card) => ({
         copies: total.copies + card.beta.normal + card.beta.foil,
@@ -120,7 +120,7 @@ export async function createGroupWorkbook(state: AppState): Promise<ExcelJS.Work
     );
     sources.addRow([
       player.displayName,
-      player.legacy ? 'Full legacy save' : 'Public API fallback',
+      player.website ? 'Public album' : player.legacy ? 'Imported save fallback' : 'Unavailable',
       beta?.totalCopies ?? 0,
       effectiveBeta.copies,
       effectiveBeta.foils,

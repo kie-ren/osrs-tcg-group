@@ -24,7 +24,7 @@ describe('parseAlbumSlug', () => {
 });
 
 describe('combinePlayerCollection', () => {
-  it('uses the complete legacy beta data instead of double-counting website beta', () => {
+  it('uses public beta instead of double-counting an imported beta save', () => {
     const player: PlayerCollection = {
       slug: 'kie',
       displayName: 'Kie',
@@ -38,7 +38,22 @@ describe('combinePlayerCollection', () => {
     };
 
     expect(combinePlayerCollection(player)[0]).toMatchObject({
-      total: { normal: 5, foil: 2 },
+      beta: { normal: 1, foil: 0 },
+      total: { normal: 3, foil: 1 },
+    });
+  });
+
+  it('uses an imported beta save when no public snapshot is available', () => {
+    const player: PlayerCollection = {
+      slug: 'kie',
+      displayName: 'Kie',
+      albumUrl: 'https://osrs-tcg.net/album/kie',
+      legacy: createSourceSnapshot({ Goblin: { normal: 3, foil: 1 } }),
+    };
+
+    expect(combinePlayerCollection(player)[0]).toMatchObject({
+      beta: { normal: 3, foil: 1 },
+      total: { normal: 3, foil: 1 },
     });
   });
 });

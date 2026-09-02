@@ -24,12 +24,3 @@ web-ext.config.ts
 *.njsproj
 *.sln
 *.sw?
-
-# Private collection data
-*.save
-*-tcg-profile.json
-
-# Local configuration
-.env
-.env.*
-!.env.example
